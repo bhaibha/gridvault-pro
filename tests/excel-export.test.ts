@@ -1,4 +1,5 @@
 // tests/excel-export.test.ts
+import * as XLSX from "xlsx";
 import { describe, it, expect } from "vitest";
 import { safeExcelString, generateWorkbook } from "../lib/excel-export";
 import { getSampleStressTestBatch } from "../lib/test-samples";
@@ -20,21 +21,29 @@ describe("Excel Export & Security Tests", () => {
   });
 
   describe("generateWorkbook", () => {
-    it("builds a 3-tab workbook with Executive_Summary, Verified_Ledger, and Line_Items_Detail", () => {
+    it("builds a 3-tab workbook with Executive_Summary, Document_Ledger, and Line_Items_Detail", () => {
       const sampleDocs = getSampleStressTestBatch();
       const wb = generateWorkbook(sampleDocs, "GST");
 
       expect(wb.SheetNames).toContain("Executive_Summary");
-      expect(wb.SheetNames).toContain("Verified_Ledger");
+      expect(wb.SheetNames).toContain("Document_Ledger");
       expect(wb.SheetNames).toContain("Line_Items_Detail");
     });
 
-    it("correctly filters out duplicates from net spend calculation", () => {
-      const sampleDocs = getSampleStressTestBatch();
-      const wb = generateWorkbook(sampleDocs, "GST");
-      const summarySheet = wb.Sheets["Executive_Summary"];
+    it("groups reconciled invoices and receipts by currency and retains review flags", () => {
+      const docs = getSampleStressTestBatch();
+      const wb = generateWorkbook(docs, "GST");
+      const summary = XLSX.utils.sheet_to_json(wb.Sheets.Executive_Summary, { header: 1 });
+      expect(summary).toContainEqual(["INR", 1, 6483.05, 42500]);
+      expect(summary).toContainEqual(["EUR", 1, 55.16, 345.5]);
+      expect(summary).toContainEqual(["Documents Flagged for Review", 2]);
+      expect(summary).not.toContainEqual(["USD", 1, 0, 0]);
 
-      expect(summarySheet).toBeDefined();
+      const ledger = XLSX.utils.sheet_to_json<Record<string, string>>(wb.Sheets.Document_Ledger);
+      expect(ledger.map((row) => row.Audit_Status)).toEqual([
+        "VERIFIED", "MATH_CHECK", "DUPLICATE", "VERIFIED", "VERIFIED",
+      ]);
+      expect(new Set(ledger.map((row) => row.Doc_ID)).size).toBe(docs.length);
     });
   });
 });

@@ -56,7 +56,7 @@ export default function TermsPage() {
             </div>
             <h4 className="font-bold text-sm text-white">30-Day Money-Back</h4>
             <p className="text-xs text-slate-400">
-              If GridVault Pro doesn&apos;t save you at least 10 hours on bookkeeping, request a 100% refund.
+              Request a refund within 30 days of purchase.
             </p>
           </div>
 
@@ -80,7 +80,7 @@ export default function TermsPage() {
             </p>
             <ul className="list-disc pl-5 space-y-1.5 text-slate-400">
               <li>Deploy and run the GridVault Pro workspace on up to three (3) personal or company devices simultaneously.</li>
-              <li>Process an unlimited volume of invoices, receipts, bills, statements, and business cards.</li>
+              <li>Process supported invoices and receipts within the workspace limits.</li>
               <li>Customize, modify, and format all eight (8) master spreadsheet workbooks for internal business and client accounting.</li>
               <li>Deliver final client audit workbooks, tax schedules, and financial reports without licensing attribution.</li>
             </ul>
@@ -91,7 +91,7 @@ export default function TermsPage() {
             <p>You agree not to:</p>
             <ul className="list-disc pl-5 space-y-1.5 text-slate-400">
               <li>Resell, redistribute, share, lease, or sub-license the standalone master template `.xlsx` files to third parties or public template marketplaces.</li>
-              <li>Reverse engineer the license verification API or redistribute master founder bypass keys.</li>
+              <li>Redistribute customer license keys.</li>
               <li>Offer GridVault Pro as a publicly hosted multi-tenant SaaS extraction service without an enterprise agency license.</li>
             </ul>
           </section>
@@ -99,7 +99,7 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h3 className="text-lg font-bold text-white">3. 30-Day Money-Back Guarantee</h3>
             <p>
-              We stand behind GridVault Pro with a strict <strong>30-Day No-Questions-Asked Money-Back Guarantee</strong>. If the software fails to process your receipts or if you are unsatisfied for any reason, email <span className="text-emerald-400">support@gridvaultpro.com</span> within 30 days of purchase for a prompt 100% refund processed via Lemon Squeezy or Gumroad.
+              We stand behind GridVault Pro with a strict <strong>30-Day No-Questions-Asked Money-Back Guarantee</strong>. If the software fails to process your receipts or if you are unsatisfied for any reason, email <span className="text-emerald-400">support@gridvaultpro.com</span> within 30 days of purchase for a prompt 100% refund processed via Lemon Squeezy.
             </p>
           </section>
 

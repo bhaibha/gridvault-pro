@@ -184,7 +184,7 @@ export function getSampleStressTestBatch(): ExtractedDocument[] {
       mathVerified: true,
       isDuplicate: false,
       duplicateHash: hash5,
-      notesOrEmail: "Email: sarah.jenkins@cloudscale.io | Cell: +1 (415) 890-2391 | CloudScale AI Infrastructure",
+      notesOrEmail: "Email: sarah.jenkins@example.com | Cell: +1 (415) 555-0132 | CloudScale AI Infrastructure",
       lineItems: [],
     },
   ];

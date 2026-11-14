@@ -5,7 +5,6 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   FileSpreadsheet,
-  KeyRound,
   UploadCloud,
   CheckCircle2,
   AlertTriangle,
@@ -15,66 +14,31 @@ import {
   Filter,
   ExternalLink,
   ShieldCheck,
-  Building2,
   RefreshCw,
   Eye,
   X,
   FileText,
   Sparkles,
-  Zap,
-  Layers,
-  HelpCircle,
-  Archive,
 } from "lucide-react";
 
 import {
   ExtractedDocument,
-  extractDocumentWithAI,
   computeDuplicateHash,
   sanitizeNumber,
-  DocType,
 } from "@/lib/extraction-engine";
-import {
-  saveEncryptedApiKey,
-  loadDecryptedApiKey,
-  getSavedProvider,
-} from "@/lib/crypto-vault";
-import { exportMasterWorkbook, exportAsCsv, TaxReportingMode } from "@/lib/excel-export";
+import { exportMasterWorkbook, exportAsCsv, safeExcelString, TaxReportingMode } from "@/lib/excel-export";
 import { getSampleStressTestBatch } from "@/lib/test-samples";
-import { ApiKeyModal } from "@/components/ApiKeyModal";
-import { VaultModal } from "@/components/VaultModal";
-import { CustomTemplateStudio } from "@/components/CustomTemplateStudio";
-import { GoogleSheetsModal } from "@/components/GoogleSheetsModal";
-import { WelcomeModal } from "@/components/WelcomeModal";
-import { downloadFullCustomerVaultZip } from "@/lib/bundle-packager";
-import { CustomTemplate } from "@/lib/custom-template-store";
-import {
-  pushRowsToGoogleSheet,
-  getSavedGoogleSheetWebhook,
-} from "@/lib/google-sheets-sync";
+import { reviewStatus, summarizeSpend } from "@/lib/ledger-review";
+import { BATCH_LIMIT, FILE_LIMIT_BYTES, DOCUMENT_TYPES } from "@/lib/workspace-limits";
 
 export default function WorkspacePage() {
-  // License & Key state
-  const [licenseKey, setLicenseKey] = useState("GVPRO-FOUNDER-2026-LIFETIME");
-  const [licenseVerified, setLicenseVerified] = useState(true);
-  const [customerName, setCustomerName] = useState("Founder / Lifetime Master Tier");
-  const [provider, setProvider] = useState<"gemini" | "openai">("gemini");
-  const [hasEncryptedKey, setHasEncryptedKey] = useState(false);
-  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
-  const [isVaultOpen, setIsVaultOpen] = useState(false);
-  const [isCustomStudioOpen, setIsCustomStudioOpen] = useState(false);
-  const [isGSheetsModalOpen, setIsGSheetsModalOpen] = useState(false);
-  const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
-  const [isDownloadingVault, setIsDownloadingVault] = useState(false);
-  const [activeCustomTemplate, setActiveCustomTemplate] = useState<CustomTemplate | null>(null);
-  const [gsheetWebhook, setGsheetWebhook] = useState<string | null>(null);
-  const [isSyncingGSheet, setIsSyncingGSheet] = useState(false);
-
-  // Workspace configuration
-  const [docType, setDocType] = useState<DocType>("INVOICE");
+  const [licenseKey, setLicenseKey] = useState("");
+  const [licenseVerified, setLicenseVerified] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [docType, setDocType] = useState<"INVOICE" | "RECEIPT">("INVOICE");
   const [taxMode, setTaxMode] = useState<TaxReportingMode>("GST");
-  const [customPrompt, setCustomPrompt] = useState("");
   const [filterReviewOnly, setFilterReviewOnly] = useState(false);
+  const processing = useRef(false);
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -87,90 +51,21 @@ export default function WorkspacePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load persisted documents, tour state & encrypted key on mount
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedDocs = localStorage.getItem("gridvault_ledger_v1");
-      if (savedDocs) {
-        try {
-          setDocuments(JSON.parse(savedDocs));
-        } catch {
-          // Ignore parse errors
-        }
-      }
-
-      // Check if first-time user needs welcome onboarding tour
-      const hasSeenTour = localStorage.getItem("gridvault_tour_completed");
-      if (!hasSeenTour) {
-        setIsWelcomeOpen(true);
-      }
-
-      setProvider(getSavedProvider());
-
-      loadDecryptedApiKey(licenseKey).then((key) => {
-        if (key) {
-          setHasEncryptedKey(true);
-        }
-      });
-
-      const savedWebhook = getSavedGoogleSheetWebhook();
-      if (savedWebhook) {
-        setGsheetWebhook(savedWebhook);
-      }
-    }
-  }, [licenseKey]);
-
-  // Customer Fulfillment Vault (.zip) Handler
-  const handleDownloadCustomerVault = async () => {
     try {
-      setIsDownloadingVault(true);
-      setProgressText("Packaging all 8 Master Spreadsheets, Google Apps Script & Commercial License...");
-      await downloadFullCustomerVaultZip();
-      setProgressText("GridVault_Pro_Fulfillment_Vault.zip downloaded successfully!");
-    } catch (err: any) {
-      console.error(err);
-      alert("Error generating fulfillment zip: " + (err?.message || "Unknown error"));
-    } finally {
-      setIsDownloadingVault(false);
+      const savedDocs = JSON.parse(localStorage.getItem("gridvault_ledger_v1") ?? "[]");
+      if (Array.isArray(savedDocs)) setDocuments(savedDocs);
+      if (new URLSearchParams(location.search).get("checkout") === "unavailable") {
+        setProgressText("Checkout is unavailable. You can still try the sample batch.");
+      }
+    } catch {
+      // A previously saved workspace may be unavailable.
     }
-  };
-
-  // Google Sheets Direct Live Push Handler
-  const handlePushToGoogleSheet = async () => {
-    if (!gsheetWebhook) {
-      setIsGSheetsModalOpen(true);
-      return;
-    }
-    if (documents.length === 0) {
-      alert("No documents in workspace to push.");
-      return;
-    }
-
-    setIsSyncingGSheet(true);
-    setProgressText(`Pushing ${documents.length} verified rows to Google Sheet...`);
-
-    const result = await pushRowsToGoogleSheet(gsheetWebhook, documents);
-    setIsSyncingGSheet(false);
-
-    if (result.success) {
-      setProgressText(`Successfully pushed ${documents.length} row(s) directly to your live Google Sheet!`);
-      alert(`Success! ${documents.length} row(s) were pushed directly to your Google Sheet in real time.`);
-    } else {
-      setProgressText(`Google Sheets sync error: ${result.error}`);
-      alert(`Sync failed: ${result.error}. Check your Apps Script deployment URL.`);
-    }
-  };
-
-  // Custom Template Schema Target Selection
-  const handleSelectCustomTemplate = (tmpl: CustomTemplate) => {
-    setActiveCustomTemplate(tmpl);
-    setDocType("CUSTOM");
-    const colsStr = tmpl.columns.map((c) => `${c.name} (${c.dataType})`).join(", ");
-    setCustomPrompt(
-      `Extract structured data matching these exact custom template columns: ${colsStr}. Template: ${tmpl.name}. Currency: ${tmpl.currency}.`
-    );
-    setProgressText(`Active extraction preset set to custom template: "${tmpl.name}".`);
-  };
+    fetch("/api/verify-license", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((result) => setLicenseVerified(result.valid === true))
+      .catch(() => {});
+  }, []);
 
   // Recalculates duplicates and persists to localStorage
   const updateLedger = (updated: ExtractedDocument[]) => {
@@ -181,95 +76,93 @@ export default function WorkspacePage() {
         doc.vendorOrContact,
         doc.invoiceOrRefNo,
         doc.totalAmount
-      );
-      const isDup = seenHashes.has(hash);
-      seenHashes.add(hash);
+      ) + ":" + doc.currency;
+      const hasIdentity = doc.date && doc.vendorOrContact && doc.invoiceOrRefNo && doc.invoiceOrRefNo !== "N/A";
+      const isDup = Boolean(hasIdentity && seenHashes.has(hash));
+      if (hasIdentity) seenHashes.add(hash);
       return { ...doc, duplicateHash: hash, isDuplicate: isDup };
     });
 
     setDocuments(deduped);
-    if (typeof window !== "undefined") {
+    try {
       localStorage.setItem("gridvault_ledger_v1", JSON.stringify(deduped));
+    } catch {
+      // The current ledger is still available for export.
     }
   };
 
-  const handleVerifyLicense = async (keyToVerify: string) => {
+  const handleVerifyLicense = async () => {
+    if (isVerifying) return;
+    setIsVerifying(true);
     try {
-      const res = await fetch("/api/verify-license", {
+      const keyHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(licenseKey.trim()));
+      const fingerprint = Array.from(new Uint8Array(keyHash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      const activationStorageKey = `gridvault_activation_${fingerprint}`;
+      const instanceId = localStorage.getItem(activationStorageKey);
+      const response = await fetch("/api/verify-license", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ licenseKey: keyToVerify }),
+        body: JSON.stringify({
+          licenseKey,
+          instanceId,
+        }),
       });
-      const data = await res.json();
-      if (data.valid) {
-        setLicenseVerified(true);
-        setCustomerName(data.customerName || "Pro Customer");
-        setProgressText("Lemon Squeezy License active. Unlimited batches unlocked.");
-      } else {
-        setLicenseVerified(false);
-        setProgressText(`License invalid: ${data.error}`);
+      const result = await response.json();
+      if (!response.ok) {
+        setProgressText(result.error);
+        return;
       }
+      setLicenseVerified(true);
+      localStorage.setItem(activationStorageKey, result.instanceId);
+      setLicenseKey("");
+      setProgressText("Pro license active.");
     } catch {
-      setProgressText("License server unreachable. Operating in offline grace mode.");
+      setProgressText("License activation could not be completed. Try again.");
+    } finally {
+      setIsVerifying(false);
     }
   };
 
-  // Process uploaded files with batch throttling (concurrency of 3)
   const processFiles = async (files: FileList | File[]) => {
-    const activeKey = await loadDecryptedApiKey(licenseKey);
-    if (!activeKey) {
-      setIsKeyModalOpen(true);
-      setProgressText("Please save your OpenAI or Gemini API key in the Vault first.");
+    if (processing.current || !files.length) return;
+    if (!licenseVerified) {
+      setProgressText("Activate your Pro license to upload documents, or try the sample batch.");
+      return;
+    }
+    if (files.length > BATCH_LIMIT) {
+      setProgressText(`Select up to ${BATCH_LIMIT} files per batch.`);
       return;
     }
 
+    processing.current = true;
     setIsProcessing(true);
-    const fileList = Array.from(files);
-    const newDocs: ExtractedDocument[] = [];
-    const concurrency = 3;
-
-    for (let i = 0; i < fileList.length; i += concurrency) {
-      const chunk = fileList.slice(i, i + concurrency);
-      setProgressText(
-        `Extracting files ${i + 1} to ${Math.min(i + concurrency, fileList.length)} of ${fileList.length}...`
-      );
-
-      const results = await Promise.allSettled(
-        chunk.map(async (file) => {
-          const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const resStr = String(reader.result || "");
-              resolve(resStr.split(",")[1] || "");
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-
-          return extractDocumentWithAI(
-            base64,
-            file.type || "image/jpeg",
-            file.name,
-            activeKey,
-            provider,
-            docType,
-            customPrompt
-          );
-        })
-      );
-
-      results.forEach((res) => {
-        if (res.status === "fulfilled") {
-          newDocs.push(res.value);
-        } else {
-          console.error("Extraction error:", res.reason);
+    const extracted: ExtractedDocument[] = [];
+    const failures: string[] = [];
+    try {
+      for (const file of Array.from(files)) {
+        setProgressText(`Processing ${file.name}…`);
+        try {
+          if (!DOCUMENT_TYPES.includes(file.type) || !file.size || file.size > FILE_LIMIT_BYTES) {
+            throw new Error("Use PDF, JPG, PNG, or WEBP up to 3 MB.");
+          }
+          const form = new FormData();
+          form.set("document", file);
+          form.set("docType", docType);
+          const response = await fetch("/api/extract", { method: "POST", body: form });
+          if (response.status === 401) setLicenseVerified(false);
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error);
+          extracted.push(result.doc);
+        } catch (error) {
+          failures.push(`${file.name}: ${error instanceof Error ? error.message : "Extraction failed."}`);
         }
-      });
+      }
+      if (extracted.length) updateLedger([...documents.filter((doc) => !doc.id.startsWith("doc-sample-")), ...extracted]);
+      setProgressText([`Extracted ${extracted.length} of ${files.length} documents.`, ...failures].join(" "));
+    } finally {
+      processing.current = false;
+      setIsProcessing(false);
     }
-
-    updateLedger([...documents, ...newDocs]);
-    setIsProcessing(false);
-    setProgressText(`Extracted ${newDocs.length} document(s) successfully.`);
   };
 
   // Drag and Drop handlers
@@ -298,6 +191,7 @@ export default function WorkspacePage() {
     field: keyof ExtractedDocument,
     value: string | number
   ) => {
+    if (processing.current) return;
     const updated = documents.map((doc) => {
       if (doc.id !== id) return doc;
       const copy: Record<string, unknown> = { ...doc };
@@ -324,9 +218,6 @@ export default function WorkspacePage() {
 
         const isReconciled = Math.abs(expected - total) <= 0.12;
         copy.mathVerified = isReconciled;
-        if (isReconciled) {
-          copy.confidence = 0.99;
-        }
       } else {
         copy[field] = value;
       }
@@ -338,16 +229,20 @@ export default function WorkspacePage() {
   };
 
   const handleDeleteRow = (id: string) => {
+    if (processing.current) return;
     updateLedger(documents.filter((d) => d.id !== id));
   };
 
   const handleLoadStressTest = () => {
-    const samples = getSampleStressTestBatch();
-    updateLedger([...documents, ...samples]);
+    if (processing.current) return;
+    if (documents.some((doc) => !doc.id.startsWith("doc-sample-")) &&
+        !confirm("Replace the current ledger with sample data? Export your work first if you need to keep it.")) return;
+    updateLedger(getSampleStressTestBatch());
     setProgressText("Loaded 5 stress-test documents (1 Verified B2B, 1 Math Check, 1 Duplicate, 1 Travel, 1 Lead).");
   };
 
   const handleClearWorkspace = () => {
+    if (processing.current) return;
     if (confirm("Are you sure you want to clear all extracted rows from this workspace?")) {
       updateLedger([]);
       setProgressText("Workspace cleared.");
@@ -366,43 +261,31 @@ export default function WorkspacePage() {
       "Category",
       "Currency",
       "Subtotal",
-      taxMode === "GST" ? "CGST\tSGST\tIGST" : "Tax",
+      taxMode === "GST" ? "CGST\tSGST\tIGST\tTotal_Tax" : "Tax",
       "Grand_Total",
       "Confidence",
     ].join("\t");
 
-    const rows = documents.map((d) => {
-      const taxCols =
-        taxMode === "GST"
-          ? `${d.cgst}\t${d.sgst}\t${d.igst}`
-          : `${(d.cgst + d.sgst + d.igst + d.vatOrSalesTax).toFixed(2)}`;
-      const status = d.isDuplicate
-        ? "DUPLICATE"
-        : !d.mathVerified
-        ? "MATH_CHECK"
-        : "VERIFIED";
-      return `${d.id.slice(0, 8)}\t${d.date}\t${status}\t${d.vendorOrContact}\t${d.invoiceOrRefNo}\t${d.category}\t${d.currency}\t${d.subtotal}\t${taxCols}\t${d.totalAmount}\t${Math.round(d.confidence * 100)}%`;
+    const tsvText = (value: string) => safeExcelString(value.replace(/[\t\r\n]/g, " "));
+    const rows = documents.map((doc) => {
+      const totalTax = doc.cgst + doc.sgst + doc.igst + doc.vatOrSalesTax;
+      const tax = taxMode === "GST" ? [doc.cgst, doc.sgst, doc.igst, totalTax] : [totalTax];
+      return [
+        doc.id, doc.date, reviewStatus(doc), doc.vendorOrContact, doc.invoiceOrRefNo,
+        doc.category, doc.currency, doc.subtotal, ...tax, doc.totalAmount,
+        `${Math.round(doc.confidence * 100)}%`,
+      ].map((value) => typeof value === "string" ? tsvText(value) : value).join("\t");
     });
 
-    const tsv = [header, ...rows].join("\n");
-    navigator.clipboard.writeText(tsv);
-    alert("Formatted ledger copied to clipboard! Paste directly into Google Sheets (Cmd/Ctrl + V).");
+    navigator.clipboard.writeText([header, ...rows].join("\n"))
+      .then(() => setProgressText("Copied ledger. You can paste it into Google Sheets."))
+      .catch(() => setProgressText("Clipboard unavailable. Use Excel or CSV export."));
   };
 
-  // Metric aggregates
-  const activeDocs = documents.filter((d) => !d.isDuplicate);
-  const netSpend = activeDocs.reduce((sum, d) => sum + d.totalAmount, 0);
-  const netTax = activeDocs.reduce(
-    (sum, d) => sum + d.cgst + d.sgst + d.igst + d.vatOrSalesTax,
-    0
-  );
-  const reviewCount = documents.filter(
-    (d) => !d.mathVerified || d.confidence < 0.9 || d.isDuplicate
-  ).length;
-
-  const visibleDocs = filterReviewOnly
-    ? documents.filter((d) => !d.mathVerified || d.confidence < 0.9 || d.isDuplicate)
-    : documents;
+  const totals = summarizeSpend(documents);
+  const flaggedDocs = documents.filter((doc) => reviewStatus(doc) !== "VERIFIED");
+  const reviewCount = flaggedDocs.length;
+  const visibleDocs = filterReviewOnly ? flaggedDocs : documents;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
@@ -427,7 +310,7 @@ export default function WorkspacePage() {
 
             <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>{customerName}</span>
+              <span>{licenseVerified ? "Pro license active" : "Sample workspace"}</span>
             </div>
           </div>
 
@@ -435,14 +318,11 @@ export default function WorkspacePage() {
           <div className="flex flex-wrap items-center gap-2.5">
             <select
               value={docType}
-              onChange={(e) => setDocType(e.target.value as DocType)}
+              onChange={(e) => setDocType(e.target.value as "INVOICE" | "RECEIPT")}
               className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-200 outline-none focus:border-emerald-500 transition"
             >
               <option value="INVOICE">Preset: Vendor Invoices</option>
               <option value="RECEIPT">Preset: Itemized Receipts</option>
-              <option value="BANK_STATEMENT">Preset: Bank Statements</option>
-              <option value="BUSINESS_CARD">Preset: Business Cards / Leads</option>
-              <option value="CUSTOM">Preset: Custom Schema</option>
             </select>
 
             <select
@@ -455,72 +335,15 @@ export default function WorkspacePage() {
               <option value="SIMPLE">Tax Mode: Universal Simple</option>
             </select>
 
-            <button
-              onClick={() => setIsKeyModalOpen(true)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition ${
-                hasEncryptedKey
-                  ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-400"
-                  : "bg-amber-500/10 border-amber-500/40 text-amber-300 animate-pulse"
-              }`}
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              <span>{hasEncryptedKey ? "AI Vault (AES-256)" : "Set API Key"}</span>
-            </button>
-
-            <button
-              onClick={() => setIsCustomStudioOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition"
-            >
-              <Layers className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Custom Studio</span>
-              {activeCustomTemplate && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              )}
-            </button>
-
-            <button
-              onClick={() => setIsGSheetsModalOpen(true)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition ${
-                gsheetWebhook
-                  ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300"
-                  : "bg-slate-850 hover:bg-slate-800 text-slate-200 border-slate-700"
-              }`}
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Google Sheets</span>
-              {gsheetWebhook ? (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              ) : (
-                <span className="text-[10px] text-slate-500">Connect</span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setIsVaultOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition"
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              <span>8 Master Spreadsheets</span>
-            </button>
-
-            <button
-              onClick={handleDownloadCustomerVault}
-              disabled={isDownloadingVault}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
-              title="Download complete fulfillment package with all 8 master spreadsheets and scripts"
-            >
-              <Archive className="w-3.5 h-3.5" />
-              <span>{isDownloadingVault ? "Zipping..." : "Download Vault (.zip)"}</span>
-            </button>
-
-            <button
-              onClick={() => setIsWelcomeOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition"
-              title="Open Getting Started Onboarding Tour"
-            >
-              <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Tour</span>
-            </button>
+            {licenseVerified ? (
+              <a href="/api/vault" className="px-3 py-1.5 rounded-xl bg-emerald-600/20 text-emerald-300 text-xs font-semibold">
+                Download workbook vault
+              </a>
+            ) : (
+              <Link href="/templates" className="px-3 py-1.5 text-emerald-300 text-xs font-semibold">
+                Preview workbook vault
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -535,7 +358,7 @@ export default function WorkspacePage() {
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
                 Batch Document Ingestion
               </h2>
-              <span className="text-[11px] text-slate-500">Max 500 files</span>
+              <span className="text-[11px] text-slate-500">Up to {BATCH_LIMIT} files</span>
             </div>
 
             <div
@@ -558,15 +381,19 @@ export default function WorkspacePage() {
                   {isProcessing ? "Extracting Batch..." : "Drag & drop files or click to upload"}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  PDFs, JPGs, PNGs, WEBP receipts &amp; invoices
+                  PDF, JPG, PNG, WEBP · 3 MB per file · Sent to Gemini for extraction
                 </p>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept="image/*,application/pdf"
-                onChange={(e) => e.target.files && processFiles(e.target.files)}
+                accept={DOCUMENT_TYPES.join(",")}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  e.target.value = "";
+                  void processFiles(files);
+                }}
                 className="hidden"
                 disabled={isProcessing}
               />
@@ -582,20 +409,6 @@ export default function WorkspacePage() {
                 <span>Load Stress-Test Batch (5 Docs)</span>
               </button>
 
-              {docType === "CUSTOM" && (
-                <div className="space-y-1 pt-2">
-                  <label className="text-[11px] text-slate-400 font-medium">
-                    Custom Prompt / Columns
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="e.g. Extract PO number, shipping tracking ID, carrier..."
-                    value={customPrompt}
-                    onChange={(e) => setCustomPrompt(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-emerald-500"
-                  />
-                </div>
-              )}
             </div>
 
             {/* Progress feed */}
@@ -605,7 +418,7 @@ export default function WorkspacePage() {
                   isProcessing ? "bg-emerald-400 animate-ping" : "bg-slate-600"
                 }`}
               />
-              <span className="truncate">{progressText}</span>
+              <span role="status" className="break-words">{progressText}</span>
             </div>
           </div>
 
@@ -615,25 +428,28 @@ export default function WorkspacePage() {
               License &amp; Device Verification
             </span>
             <div className="space-y-1.5">
-              <label className="text-slate-400">License Key</label>
+              <label htmlFor="license-key" className="text-slate-400">Purchase license key</label>
               <div className="flex gap-2">
                 <input
-                  type="text"
+                  id="license-key"
+                  type="password"
+                  autoComplete="off"
                   value={licenseKey}
                   onChange={(e) => setLicenseKey(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-white"
                 />
                 <button
-                  onClick={() => handleVerifyLicense(licenseKey)}
+                  onClick={handleVerifyLicense}
+                  disabled={isVerifying || !licenseKey.trim()}
                   className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs whitespace-nowrap"
                 >
-                  Verify
+                  {isVerifying ? "Verifying…" : "Activate"}
                 </button>
               </div>
             </div>
             <div className="flex items-center gap-1.5 text-emerald-400 font-semibold text-[11px]">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>3 Device Commercial License Active</span>
+              <span>{licenseVerified ? "Pro license active" : "Sample mode"}</span>
             </div>
           </div>
         </section>
@@ -644,38 +460,36 @@ export default function WorkspacePage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
               <span className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider">
-                Verified Spend (Excl. Dups)
+                Reconciled spend
               </span>
-              <p className="text-2xl font-bold font-mono text-white mt-1">
-                {netSpend.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </p>
-              <span className="text-[11px] text-slate-500 mt-0.5 block">
-                {activeDocs.length} valid transaction(s)
-              </span>
+              {totals.length ? totals.map(([currency, total]) => (
+                <p key={currency} className="font-mono text-white mt-1">
+                  {currency} {total.spend.toFixed(2)}
+                </p>
+              )) : <p className="mt-1 text-slate-400">No reconciled invoices or receipts</p>}
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
               <span className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider">
-                Claimable Input Tax
+                Extracted tax
               </span>
-              <p className="text-2xl font-bold font-mono text-emerald-400 mt-1">
-                {netTax.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </p>
-              <span className="text-[11px] text-slate-500 mt-0.5 block">
-                GST / VAT claimable total
-              </span>
+              {totals.length ? totals.map(([currency, total]) => (
+                <p key={currency} className="font-mono text-emerald-400 mt-1">
+                  {currency} {total.tax.toFixed(2)}
+                </p>
+              )) : <p className="mt-1 text-slate-400">No reconciled invoices or receipts</p>}
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
               <div>
                 <span className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider">
-                  Flagged for Audit
+                  Flagged for review
                 </span>
                 <p className="text-2xl font-bold font-mono text-amber-400 mt-1">
                   {reviewCount}
                 </p>
                 <span className="text-[11px] text-slate-500 mt-0.5 block">
-                  Math check or duplicates
+                  Math, confidence, currency, or duplicates
                 </span>
               </div>
               <button
@@ -700,21 +514,11 @@ export default function WorkspacePage() {
                   Interactive Confidence Ledger
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Click any cell to edit. Math auto-reconciles in real time.
+                  Edit ledger values to rerun the math check. Compare flagged rows with the original documents.
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={handlePushToGoogleSheet}
-                  disabled={documents.length === 0 || isSyncingGSheet}
-                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition disabled:opacity-40"
-                  title="Directly append verified rows to your live Google Sheet"
-                >
-                  <Zap className="w-3.5 h-3.5 text-slate-950 fill-current" />
-                  <span>{isSyncingGSheet ? "Syncing..." : "Push to Google Sheet"}</span>
-                </button>
-
                 <button
                   onClick={handleCopyGoogleSheets}
                   disabled={documents.length === 0}
@@ -804,12 +608,13 @@ export default function WorkspacePage() {
                 </thead>
                 <tbody className="divide-y divide-slate-800/80 font-sans">
                   {visibleDocs.map((doc, rIdx) => {
-                    const isMathErr = !doc.mathVerified && doc.docType !== "BUSINESS_CARD";
+                    const status = reviewStatus(doc);
+                    const needsReview = status !== "VERIFIED";
                     const isDup = doc.isDuplicate;
 
                     const rowBg = isDup
                       ? "bg-rose-950/20 hover:bg-rose-950/30"
-                      : isMathErr
+                      : needsReview
                       ? "bg-amber-950/20 hover:bg-amber-950/30"
                       : "hover:bg-slate-850/60";
 
@@ -826,9 +631,9 @@ export default function WorkspacePage() {
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
                               DUPLICATE
                             </span>
-                          ) : isMathErr ? (
+                          ) : needsReview ? (
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                              MATH CHECK
+                              {status.replaceAll("_", " ")}
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
@@ -934,7 +739,7 @@ export default function WorkspacePage() {
                               handleCellChange(doc.id, "totalAmount", e.target.value)
                             }
                             className={`bg-transparent border border-transparent focus:border-slate-600 rounded px-1.5 py-1 w-24 text-right font-mono font-black text-sm tabular-nums outline-none ${
-                              isMathErr ? "text-amber-400" : "text-emerald-400"
+                              needsReview ? "text-amber-400" : "text-emerald-400"
                             }`}
                           />
                         </td>
@@ -1088,58 +893,6 @@ export default function WorkspacePage() {
         </div>
       )}
 
-      {/* 4. MODALS */}
-      <ApiKeyModal
-        isOpen={isKeyModalOpen}
-        onClose={() => setIsKeyModalOpen(false)}
-        licenseKey={licenseKey}
-        currentProvider={provider}
-        onProviderChange={setProvider}
-        onSaved={() => {
-          setHasEncryptedKey(true);
-          setProgressText("Key encrypted with AES-GCM 256-bit.");
-        }}
-      />
-
-      <VaultModal isOpen={isVaultOpen} onClose={() => setIsVaultOpen(false)} />
-
-      <CustomTemplateStudio
-        isOpen={isCustomStudioOpen}
-        onClose={() => setIsCustomStudioOpen(false)}
-        onSelectAsSchema={handleSelectCustomTemplate}
-      />
-
-      <GoogleSheetsModal
-        isOpen={isGSheetsModalOpen}
-        onClose={() => setIsGSheetsModalOpen(false)}
-        onConnected={(url) => {
-          setGsheetWebhook(url);
-          setProgressText("Direct Google Sheets sync active.");
-        }}
-      />
-
-      <WelcomeModal
-        isOpen={isWelcomeOpen}
-        onClose={() => {
-          setIsWelcomeOpen(false);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("gridvault_tour_completed", "true");
-          }
-        }}
-        onLoadSampleData={() => {
-          handleLoadStressTest();
-          setIsWelcomeOpen(false);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("gridvault_tour_completed", "true");
-          }
-        }}
-        onOpenKeyModal={() => {
-          setIsWelcomeOpen(false);
-          setIsKeyModalOpen(true);
-        }}
-        hasKey={hasEncryptedKey}
-        customerName={customerName}
-      />
     </div>
   );
 }
