@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PRO_PRICE_LABEL } from "@/lib/pro-pricing";
 import { BATCH_LIMIT } from "@/lib/workspace-limits";
 
 import { checkoutUrl } from "@/lib/checkout";
@@ -8,7 +9,7 @@ export function PricingCards() {
   return (
     <div className="max-w-lg mx-auto rounded-3xl border-2 border-emerald-500 bg-slate-900 p-8">
       <h3 className="font-bold text-white text-xl">Pro license</h3>
-      <p className="mt-2 text-3xl font-bold text-white">$100 <span className="text-sm text-slate-400">one-time</span></p>
+      <p className="mt-2 text-3xl font-bold text-white">{PRO_PRICE_LABEL} <span className="text-sm text-slate-400">one-time</span></p>
       <ul className="my-6 space-y-2 text-sm text-slate-300">
         <li>Extract invoices and receipts, including line items</li>
         <li>Up to {BATCH_LIMIT} files per batch, up to 3 MB each</li>

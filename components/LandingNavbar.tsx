@@ -3,6 +3,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { PRO_PRICE_LABEL } from "@/lib/pro-pricing";
 import { FileSpreadsheet, KeyRound, Sparkles, ArrowRight, ShieldCheck } from "lucide-react";
 
 export function LandingNavbar() {
@@ -18,7 +19,7 @@ export function LandingNavbar() {
             <div className="flex items-center gap-2">
               <span className="font-bold text-lg tracking-tight text-white">GridVault Pro</span>
               <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                $100 Lifetime
+                {PRO_PRICE_LABEL} Lifetime
               </span>
             </div>
             <span className="text-[11px] text-slate-400 -mt-0.5 hidden sm:inline">

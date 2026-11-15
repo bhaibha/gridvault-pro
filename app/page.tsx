@@ -133,7 +133,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 5. THE $100 VALUE MULTIPLIER: 8 TURNKEY SPREADSHEETS */}
+      {/* 5. WORKBOOK VAULT */}
       <section id="features" className="py-20 border-t border-slate-900 bg-slate-900/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           <div className="text-center space-y-3 max-w-3xl mx-auto">
