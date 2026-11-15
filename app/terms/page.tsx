@@ -55,7 +55,7 @@ export default function TermsPage() {
             </div>
             <h4 className="font-bold text-sm text-white">Lifetime Ownership</h4>
             <p className="text-xs text-slate-400">
-              Pay once for $100. Never pay monthly software subscriptions or seat renewal fees.
+              A single payment covers the software license. There are no subscription or seat renewal fees.
             </p>
           </div>
 

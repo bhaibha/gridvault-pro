@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GridVault Pro | $100 Lifetime Document-to-Spreadsheet Suite",
+  title: "GridVault Pro | Document-to-Spreadsheet Suite",
   description:
     "Extract invoice and receipt data into an editable Excel workbook for review.",
   keywords: [
