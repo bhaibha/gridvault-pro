@@ -1,67 +1,25 @@
-# GridVault Pro ($100 Lifetime Document-to-Spreadsheet Suite)
+# GridVault Pro
 
-[![Next.js](https://img.shields.io/badge/Next.js-14.2-black?logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![TailwindCSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
-[![License](https://img.shields.io/badge/License-Commercial-emerald)](#)
+GridVault Pro extracts invoice and receipt fields into a reviewable Excel ledger. The sample workspace and Excel export work without a license or an AI account.
 
-GridVault Pro is a commercial-grade, zero-server-overhead document/receipt-to-spreadsheet application. It combines a client-side BYOK (Bring Your Own Key) web micro-app with an automated multi-tab Excel and Google Sheets vault.
+## Run locally
 
----
-
-## Key Highlights
-
-- **Anti-Subscription Model:** Positioned at a $100 one-time lifetime price point to eliminate recurring $30-$500/mo SaaS bills.
-- **Client-Side AES-GCM 256-Bit Vault:** Users connect their Google Gemini or OpenAI API keys securely in the browser. Zero server liability.
-- **500-File Batch Concurrency Queue:** Client-side throttled file batching with live progress bars and drag-and-drop dropzone.
-- **Automated Math Reconciliation:** Checks $\text{Subtotal} + \text{Tax} = \text{Total}$. Automatically downgrades confidence and triggers an amber `MATH CHECK` badge on discrepancies.
-- **Cryptographic Duplicate Detection:** Fingerprints invoices (`Date_Vendor_RefNo_Total`) to identify and suppress duplicate supplier billing.
-- **3-Tab Native Excel (.xlsx) Generator:** Built with SheetJS and hardened against CSV/Excel formula injection attacks.
-  - Tab 1: `Executive_Summary`
-  - Tab 2: `Verified_Ledger`
-  - Tab 3: `Line_Items_Detail`
-- **8 Turnkey Master Spreadsheet Workbooks:** 4 B2B workbooks (Tax Ledger, Job Costing, Cash Flow, Lead CRM) + 4 B2C workbooks (Tax Organizer, Subscription Leaks, Warranty Tracker, Travel Claims).
-
----
-
-## Quickstart (Local Development)
-
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Run unit tests (Vitest)
-npm test
-
-# 3. Start development server
+```sh
+npm ci
 npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser:
-- Marketing Landing Page & Sandbox: `http://localhost:3000/`
-- Workspace Web App: `http://localhost:3000/app`
-- Spreadsheet Vault: `http://localhost:3000/templates`
-
----
-
-## Testing & QA Verification
-
-Run the automated test suite:
-```bash
 npm test
-```
-The test suite covers:
-- Currency and international number parsing (including European commas and Indian numbering).
-- Idempotent duplicate hash generation.
-- Formula injection protection (`=`, `+`, `-`, `@`).
-- 3-tab workbook generation and duplicate exclusion logic.
-
----
-
-## Production Build
-
-```bash
 npm run build
-npm run start
 ```
-Verified with 0 TypeScript errors and 0 lint warnings. Ready for immediate deployment to Vercel, Cloudflare Pages, or AWS Amplify.
+
+Open http://localhost:3000. Load the five-document sample in the workspace and export the workbook. Reconciled invoice and receipt amounts are grouped by currency. The Document Ledger and Line Items tabs retain review flags. The eight additional workbooks are sample layouts with example data.
+
+## Configure a paid pilot
+
+Copy `.env.example` to `.env.local` for local testing or set the listed variables in the hosting dashboard. Use a different set for previews and production.
+
+1. Create a one-time Lemon Squeezy Pro variant, enable license issuance and set its activation limit to three. Copy its checkout URL, store ID and variant ID. Start in test mode and set `GRIDVAULT_CHECKOUT_ENABLED=true` on the test deployment. Checkout stays disabled by default.
+2. Generate a random session signing secret with `openssl rand -hex 32`. License approval is cached in a signed, HTTP-only cookie for one hour. After expiry, re-enter the purchase key in the same browser to revalidate its activation.
+3. Configure `GEMINI_PAID_API_KEY` with a server-side key for a paid Gemini API project and verify that billing is active. The application cannot verify the project billing tier from the key. Choose provider usage limits and billing alerts suitable for the pilot. Before opening public checkout, add durable per-customer usage controls and request rate limits to the hosting environment. The current browser batch limit is not a server-side usage quota.
+4. Verify a test purchase, valid and invalid keys, repeat activation in the same browser, download access, and upload of representative redacted PDFs and images. Set `GRIDVAULT_SELLER_LEGAL_NAME` to the confirmed legal seller name and `GRIDVAULT_SUPPORT_EMAIL` to a mailbox you control. Test receiving and replying from it, and confirm the refund process before taking live payments. Confirm the legal disclosures and any governing-law wording for the actual seller and markets served. Review the provider’s data terms for your deployment and the types of documents you intend to accept.
+
+The current workspace accepts up to 25 files per batch and 3 MB per file. For Google Sheets, import the Excel workbook or paste TSV.

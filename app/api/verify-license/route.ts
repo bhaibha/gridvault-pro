@@ -1,90 +1,55 @@
-// app/api/verify-license/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { createLicenseSession, hasLicenseSession, LICENSE_COOKIE, LICENSE_SESSION_SECONDS, licenseConfig } from "@/lib/license-session";
 
-export async function POST(req: Request) {
+export function GET(req: NextRequest) {
+  return NextResponse.json(
+    { valid: hasLicenseSession(req.cookies.get(LICENSE_COOKIE)?.value) },
+    { headers: { "Cache-Control": "private, no-store" } }
+  );
+}
+
+export async function POST(req: NextRequest) {
+  const config = licenseConfig();
+  if (!config) return NextResponse.json({ error: "License activation is not configured." }, { status: 503 });
+
+  const body = await req.json().catch(() => null);
+  const licenseKey = typeof body?.licenseKey === "string" ? body.licenseKey.trim() : "";
+  const instanceId = typeof body?.instanceId === "string" ? body.instanceId : "";
+  if (!licenseKey || licenseKey.length > 128 || (instanceId && !/^[\w-]{1,80}$/.test(instanceId))) {
+    return NextResponse.json({ error: "Enter a valid purchase license key." }, { status: 400 });
+  }
+
   try {
-    const body = await req.json();
-    const { licenseKey, instanceName } = body;
-
-    if (!licenseKey || typeof licenseKey !== "string") {
-      return NextResponse.json(
-        { valid: false, error: "License key is required." },
-        { status: 400 }
-      );
-    }
-
-    const trimmedKey = licenseKey.trim();
-
-    // 1. Founder Master Key bypass for development & internal testing
-    if (
-      trimmedKey === "GVPRO-FOUNDER-2026-LIFETIME" ||
-      trimmedKey === "DEMO-SANDBOX-PRO-KEY"
-    ) {
-      return NextResponse.json({
-        valid: true,
-        tier: "PRO_LIFETIME",
-        customerName: "Founder / Lifetime Master Tier",
-        batchLimit: 500,
-        licenseKey: trimmedKey,
-        expiresAt: null,
-      });
-    }
-
-    // 2. Validate against Lemon Squeezy License API
-    try {
-      const response = await fetch("https://api.lemonsqueezy.com/v1/licenses/validate", {
+    const fields = new URLSearchParams({ license_key: licenseKey });
+    fields.set(instanceId ? "instance_id" : "instance_name", instanceId || "GridVault web browser");
+    const response = await fetch(
+      `https://api.lemonsqueezy.com/v1/licenses/${instanceId ? "validate" : "activate"}`,
+      {
         method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          license_key: trimmedKey,
-          instance_name: instanceName || "GridVault_Web_Client",
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.valid) {
-        return NextResponse.json({
-          valid: true,
-          tier: "PRO_LIFETIME",
-          customerName: data.meta?.customer_name || "Pro Customer",
-          batchLimit: 500,
-          licenseKey: trimmedKey,
-          expiresAt: null,
-        });
-      } else {
-        return NextResponse.json(
-          {
-            valid: false,
-            error: data.error || "Invalid or inactive Lemon Squeezy license key.",
-          },
-          { status: 403 }
-        );
+        headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
+        body: fields,
+        signal: AbortSignal.timeout(10000),
       }
-    } catch (networkErr) {
-      // In case Lemon Squeezy API is temporarily unreachable or blocked in dev environment,
-      // allow standard GVPRO- formatted keys with warning
-      if (trimmedKey.startsWith("GVPRO-") && trimmedKey.length >= 12) {
-        return NextResponse.json({
-          valid: true,
-          tier: "PRO_LIFETIME",
-          customerName: "Pro Customer (Offline Mode)",
-          batchLimit: 500,
-          licenseKey: trimmedKey,
-          expiresAt: null,
-        });
-      }
-
-      return NextResponse.json(
-        { valid: false, error: "Lemon Squeezy verification service unreachable." },
-        { status: 503 }
-      );
+    );
+    if (response.status >= 500 || response.status === 429) throw new Error("License service unavailable");
+    const result = await response.json();
+    const verified = instanceId ? result.valid && result.instance?.id === instanceId : result.activated;
+    const verifiedInstance = result.instance?.id;
+    if (!response.ok || !verified || !verifiedInstance ||
+        String(result.meta?.store_id) !== config.store || String(result.meta?.variant_id) !== config.variant) {
+      return NextResponse.json({ error: "This license or browser activation could not be verified." }, { status: 403 });
     }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    return NextResponse.json({ valid: false, error: msg }, { status: 500 });
+
+    const output = NextResponse.json({ valid: true, instanceId: verifiedInstance });
+    output.cookies.set(LICENSE_COOKIE, createLicenseSession(config.secret), {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: LICENSE_SESSION_SECONDS,
+    });
+    return output;
+  } catch {
+    return NextResponse.json({ error: "License verification is temporarily unavailable." }, { status: 503 });
   }
 }

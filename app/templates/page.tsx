@@ -5,7 +5,6 @@ import React, { useState } from "react";
 import Link from "next/link";
 import {
   FileSpreadsheet,
-  Download,
   Building2,
   User,
   ArrowLeft,
@@ -15,15 +14,9 @@ import {
   BarChart3,
   Layers,
   Sparkles,
-  Archive,
 } from "lucide-react";
 import { LandingNavbar } from "@/components/LandingNavbar";
-import {
-  TEMPLATE_VAULT,
-  downloadTemplateWorkbook,
-  downloadAllTemplates,
-} from "@/lib/template-generator";
-import { downloadFullCustomerVaultZip } from "@/lib/bundle-packager";
+import { TEMPLATE_VAULT } from "@/lib/template-generator";
 
 function getStatusBadgeClass(val: string | number): string {
   const str = String(val).toUpperCase();
@@ -186,35 +179,6 @@ function renderCellEntry(
 export default function TemplatesPage() {
   const [activeCategory, setActiveCategory] = useState<"ALL" | "B2B" | "B2C">("ALL");
   const [cardViewMap, setCardViewMap] = useState<Record<string, "TABLE" | "GRAPH" | "SHEETS">>({});
-  const [downloadedSet, setDownloadedSet] = useState<Set<string>>(new Set());
-  const [isZipping, setIsZipping] = useState(false);
-  const [zipProgress, setZipProgress] = useState<string>("");
-
-  const handleDownloadZip = async () => {
-    setIsZipping(true);
-    try {
-      await downloadFullCustomerVaultZip((pct, msg) => {
-        setZipProgress(`${pct}%`);
-      });
-    } catch (err) {
-      console.error(err);
-      alert("Failed to build zip archive. Please try again.");
-    } finally {
-      setIsZipping(false);
-      setZipProgress("");
-    }
-  };
-
-  const handleDownload = (id: string) => {
-    downloadTemplateWorkbook(id);
-    setDownloadedSet((prev) => new Set(prev).add(id));
-  };
-
-  const handleDownloadAll = () => {
-    downloadAllTemplates();
-    setDownloadedSet(new Set(TEMPLATE_VAULT.map((t) => t.id)));
-  };
-
   const setCardView = (id: string, view: "TABLE" | "GRAPH" | "SHEETS") => {
     setCardViewMap((prev) => ({ ...prev, [id]: view }));
   };
@@ -257,34 +221,13 @@ export default function TemplatesPage() {
                 The 8 Master Spreadsheet Workbooks
               </h1>
               <p className="text-sm text-slate-400 mt-1 max-w-3xl leading-relaxed">
-                Color-differentiated audit templates with Executive Summary dashboards, formula-driven
-                KPI summaries, and styled tables. Download as native, macro-free Excel (.xlsx) files ready
-                to receive your extracted document rows.
+                Preview eight macro-free Excel workbooks with sample data and layouts for business and personal recordkeeping.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={handleDownloadZip}
-                disabled={isZipping}
-                className="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition whitespace-nowrap active:scale-95 disabled:opacity-50"
-              >
-                <Archive className="w-4 h-4" />
-                <span>
-                  {isZipping
-                    ? `Packaging Vault (${zipProgress})...`
-                    : "Download Customer Vault (.zip)"}
-                </span>
-              </button>
-
-              <button
-                onClick={handleDownloadAll}
-                className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs flex items-center justify-center gap-2 transition whitespace-nowrap"
-              >
-                <Download className="w-4 h-4" />
-                <span>Download All (.xlsx)</span>
-              </button>
-            </div>
+            <Link href="/app" className="px-5 py-3 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs">
+              Open workspace to download
+            </Link>
           </div>
         </div>
 
@@ -361,7 +304,6 @@ export default function TemplatesPage() {
         {/* Templates Grid (2-column layout on large screens) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {displayedTemplates.map((template) => {
-            const isDownloaded = downloadedSet.has(template.id);
             const currentView = cardViewMap[template.id] || "TABLE";
 
             return (
@@ -613,8 +555,8 @@ export default function TemplatesPage() {
                       </div>
 
                       <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono px-1">
-                        <span>• Complete with automatic subtotal &amp; tax formulas</span>
-                        <span>Full sheet: 250+ rows &bull; Macro-free</span>
+                        <span>Sample data</span>
+                        <span>Macro-free Excel layout</span>
                       </div>
                     </div>
                   )}
@@ -723,26 +665,6 @@ export default function TemplatesPage() {
                     </span>
                   </div>
 
-                  <button
-                    onClick={() => handleDownload(template.id)}
-                    className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95 shadow-md ${
-                      isDownloaded
-                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-emerald-500/10"
-                        : "bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 hover:border-slate-600"
-                    }`}
-                  >
-                    {isDownloaded ? (
-                      <>
-                        <Check className="w-4 h-4 text-emerald-400" />
-                        <span>Downloaded (.xlsx)</span>
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-4 h-4" />
-                        <span>Download .XLSX</span>
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
             );
@@ -756,9 +678,9 @@ export default function TemplatesPage() {
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <strong className="text-white block text-sm">Universal Enterprise Compatibility</strong>
+              <strong className="text-white block text-sm">Excel workbook format</strong>
               <p className="text-slate-400 mt-0.5">
-                Every workbook is verified to open cleanly without macro security warnings in Microsoft Excel (2016 - 365), Google Sheets, and Apple Numbers.
+                The vault contains macro-free .xlsx files.
               </p>
             </div>
           </div>
@@ -776,7 +698,7 @@ export default function TemplatesPage() {
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-400">GridVault Pro</span>
             <span>&bull;</span>
-            <span>Instant Lemon Squeezy / Gumroad Fulfillment</span>
+            <span>Workbook previews</span>
           </div>
           <div className="flex items-center gap-5">
             <Link href="/" className="hover:text-slate-300">

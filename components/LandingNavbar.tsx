@@ -29,22 +29,17 @@ export function LandingNavbar() {
 
         {/* Links */}
         <div className="hidden md:flex items-center gap-6 text-sm text-slate-300 font-medium">
-          <a href="#features" className="hover:text-emerald-400 transition-colors">
+          <a href="/#features" className="hover:text-emerald-400 transition-colors">
             Features
           </a>
-          <a href="#roi-calculator" className="hover:text-emerald-400 transition-colors">
-            ROI Calculator
-          </a>
-          <a href="#comparison" className="hover:text-emerald-400 transition-colors">
-            Comparison
-          </a>
+          <a href="/#demo" className="hover:text-emerald-400">Sample demo</a>
           <Link href="/templates" className="hover:text-emerald-400 transition-colors flex items-center gap-1.5">
             <span>8 Master Templates</span>
             <span className="px-1.5 py-0.5 text-[9px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded font-semibold">
-              FREE VAULT
+              PREVIEW
             </span>
           </Link>
-          <a href="#pricing" className="hover:text-emerald-400 transition-colors">
+          <a href="/#pricing" className="hover:text-emerald-400 transition-colors">
             Pricing
           </a>
         </div>

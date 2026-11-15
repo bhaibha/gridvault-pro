@@ -1112,13 +1112,7 @@ export const TEMPLATE_VAULT: TemplateDefinition[] = [
   },
 ];
 
-export function downloadTemplateWorkbook(templateId: string): void {
-  const template = TEMPLATE_VAULT.find((t) => t.id === templateId);
-  if (!template) {
-    console.error(`Template not found: ${templateId}`);
-    return;
-  }
-
+export function buildTemplateWorkbook(template: TemplateDefinition): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
 
   template.sheets.forEach((sheet) => {
@@ -1129,13 +1123,5 @@ export function downloadTemplateWorkbook(templateId: string): void {
     XLSX.utils.book_append_sheet(wb, ws, sheet.sheetName);
   });
 
-  XLSX.writeFile(wb, template.fileName);
-}
-
-export function downloadAllTemplates(): void {
-  TEMPLATE_VAULT.forEach((template, idx) => {
-    setTimeout(() => {
-      downloadTemplateWorkbook(template.id);
-    }, idx * 300);
-  });
+  return wb;
 }
