@@ -30,11 +30,23 @@ describe("Excel Export & Security Tests", () => {
       expect(wb.SheetNames).toContain("Line_Items_Detail");
     });
 
+    it("reconciles demo line items, subtotal, and GST to the cent", () => {
+      const [invoice, , duplicate] = getSampleStressTestBatch();
+      for (const item of invoice.lineItems) {
+        expect(Math.round(item.quantity * item.unitPrice * 100)).toBe(Math.round(item.lineTotal * 100));
+      }
+      expect(invoice.lineItems.reduce((cents, item) => cents + Math.round(item.lineTotal * 100), 0))
+        .toBe(Math.round(invoice.subtotal * 100));
+      expect(Math.round((invoice.subtotal + invoice.cgst + invoice.sgst) * 100))
+        .toBe(Math.round(invoice.totalAmount * 100));
+      expect(duplicate.totalAmount).toBe(invoice.totalAmount);
+    });
+
     it("groups reconciled invoices and receipts by currency and retains review flags", () => {
       const docs = getSampleStressTestBatch();
       const wb = generateWorkbook(docs, "GST");
       const summary = XLSX.utils.sheet_to_json(wb.Sheets.Executive_Summary, { header: 1 });
-      expect(summary).toContainEqual(["INR", 1, 6483.05, 42500]);
+      expect(summary).toContainEqual(["INR", 1, 6483.06, 42500.06]);
       expect(summary).toContainEqual(["EUR", 1, 55.16, 345.5]);
       expect(summary).toContainEqual(["Documents Flagged for Review", 2]);
       expect(summary).not.toContainEqual(["USD", 1, 0, 0]);

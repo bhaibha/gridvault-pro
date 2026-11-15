@@ -5,7 +5,9 @@ export function getSampleStressTestBatch(): ExtractedDocument[] {
   const doc1Date = "2026-11-04";
   const doc1Vendor = "Apex Industrial Supplies Ltd";
   const doc1Ref = "INV-2026-9041";
-  const doc1Total = 42500;
+  const steelSubtotal = 36017;
+  const steelTaxPerComponent = 3241.53;
+  const doc1Total = 42500.06;
 
   const doc2Date = "2026-11-05";
   const doc2Vendor = "Metro Electricals & Hardware";
@@ -15,7 +17,7 @@ export function getSampleStressTestBatch(): ExtractedDocument[] {
   const doc3Date = "2026-11-04";
   const doc3Vendor = "Apex Industrial Supplies Ltd";
   const doc3Ref = "INV-2026-9041"; // Duplicate of Doc 1
-  const doc3Total = 42500;
+  const doc3Total = doc1Total;
 
   const doc4Date = "2026-11-06";
   const doc4Vendor = "Grand Continental Hotel & Dining";
@@ -44,9 +46,9 @@ export function getSampleStressTestBatch(): ExtractedDocument[] {
       taxId: "27AABCA1234F1Z8",
       category: "Materials",
       currency: "INR",
-      subtotal: 36016.95,
-      cgst: 3241.52,
-      sgst: 3241.53,
+      subtotal: steelSubtotal,
+      cgst: steelTaxPerComponent,
+      sgst: steelTaxPerComponent,
       igst: 0,
       vatOrSalesTax: 0,
       totalAmount: doc1Total,
@@ -68,7 +70,7 @@ export function getSampleStressTestBatch(): ExtractedDocument[] {
           sku: "BEAM-200",
           quantity: 10,
           unitPrice: 1476.7,
-          lineTotal: 14766.95,
+          lineTotal: 14767,
         },
       ],
     },
@@ -113,9 +115,9 @@ export function getSampleStressTestBatch(): ExtractedDocument[] {
       taxId: "27AABCA1234F1Z8",
       category: "Materials",
       currency: "INR",
-      subtotal: 36016.95,
-      cgst: 3241.52,
-      sgst: 3241.53,
+      subtotal: steelSubtotal,
+      cgst: steelTaxPerComponent,
+      sgst: steelTaxPerComponent,
       igst: 0,
       vatOrSalesTax: 0,
       totalAmount: doc3Total,

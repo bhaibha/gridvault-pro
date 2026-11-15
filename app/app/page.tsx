@@ -55,9 +55,6 @@ export default function WorkspacePage() {
     try {
       const savedDocs = JSON.parse(localStorage.getItem("gridvault_ledger_v1") ?? "[]");
       if (Array.isArray(savedDocs)) setDocuments(savedDocs);
-      if (new URLSearchParams(location.search).get("checkout") === "unavailable") {
-        setProgressText("Checkout is unavailable. You can still try the sample batch.");
-      }
     } catch {
       // A previously saved workspace may be unavailable.
     }

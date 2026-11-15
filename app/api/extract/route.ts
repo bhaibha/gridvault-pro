@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Activate your Pro license to upload documents." }, { status: 401 });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_PAID_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "Document extraction is not configured." }, { status: 503 });
   }

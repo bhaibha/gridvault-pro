@@ -1,16 +1,12 @@
 import { NextResponse } from "next/server";
-import { licenseConfig } from "@/lib/license-session";
+import { checkoutUrl } from "@/lib/checkout";
 
-export function GET(req: Request) {
-  let checkout: URL | undefined;
-  try {
-    checkout = new URL(process.env.LEMON_SQUEEZY_CHECKOUT_URL ?? "");
-  } catch {
-    // In demo deployments the checkout URL is unset.
-  }
-  if (process.env.GRIDVAULT_CHECKOUT_ENABLED !== "true" || !licenseConfig() || !process.env.GEMINI_API_KEY || checkout?.protocol !== "https:" ||
-      !checkout.hostname.endsWith(".lemonsqueezy.com") || !checkout.pathname.startsWith("/checkout/buy/")) {
-    return NextResponse.redirect(new URL("/app?checkout=unavailable", req.url));
+export const dynamic = "force-dynamic";
+
+export function GET() {
+  const checkout = checkoutUrl();
+  if (!checkout) {
+    return NextResponse.json({ error: "Checkout is currently unavailable." }, { status: 503 });
   }
   return NextResponse.redirect(checkout);
 }

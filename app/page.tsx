@@ -1,7 +1,6 @@
 // app/page.tsx
-"use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import {
   FileSpreadsheet,
@@ -24,9 +23,9 @@ import { LandingNavbar } from "@/components/LandingNavbar";
 import { DemoSandbox } from "@/components/DemoSandbox";
 import { PricingCards } from "@/components/PricingCards";
 
-export default function LandingPage() {
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
+export const dynamic = "force-dynamic";
 
+export default function LandingPage() {
   const faqs = [
     {
       q: "What can I try before buying?",
@@ -34,7 +33,15 @@ export default function LandingPage() {
     },
     {
       q: "Where are uploaded files processed?",
-      a: "GridVault sends your file to Google Gemini for extraction. The resulting ledger is saved in this browser so you can export it or clear it when you finish.",
+      a: "GridVault sends uploaded invoices and receipts to Google Gemini using a paid API project configured by the operator. You do not need to enter your own API key. The ledger is saved in this browser.",
+    },
+    {
+      q: "What happens after I buy?",
+      a: "Lemon Squeezy issues your license key. Enter it in the GridVault workspace to activate uploads and download the workbook vault.",
+    },
+    {
+      q: "What is the refund policy?",
+      a: "You can request a full refund for any reason within 30 days of purchase. See Terms & License for how to request one.",
     },
     {
       q: "Can I use the results in Google Sheets?",
@@ -266,32 +273,15 @@ export default function LandingPage() {
           </div>
 
           <div className="space-y-3 pt-4">
-            {faqs.map((faq, idx) => {
-              const isOpen = openFaq === idx;
-              return (
-                <div
-                  key={idx}
-                  className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden transition"
-                >
-                  <button
-                    onClick={() => setOpenFaq(isOpen ? null : idx)}
-                    className="w-full p-5 text-left flex items-center justify-between text-sm sm:text-base font-semibold text-white hover:text-emerald-400 transition"
-                  >
-                    <span>{faq.q}</span>
-                    <ChevronDown
-                      className={`w-4 h-4 text-slate-400 transition-transform ${
-                        isOpen ? "rotate-180 text-emerald-400" : ""
-                      }`}
-                    />
-                  </button>
-                  {isOpen && (
-                    <div className="px-5 pb-5 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-slate-800/60 pt-3">
-                      {faq.a}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {faqs.map(({ q, a }) => (
+              <details key={q} className="group rounded-2xl border border-slate-800 bg-slate-900">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 font-semibold text-white hover:text-emerald-400">
+                  {q}
+                  <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400 group-open:rotate-180" />
+                </summary>
+                <p className="border-t border-slate-800/60 px-5 py-4 text-sm text-slate-300">{a}</p>
+              </details>
+            ))}
           </div>
         </div>
       </section>

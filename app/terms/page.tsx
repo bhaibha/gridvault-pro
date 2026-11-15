@@ -2,6 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import { ArrowLeft, FileText, CheckCircle, RefreshCcw, AlertTriangle } from "lucide-react";
+import { sellerDetails } from "@/lib/seller-details";
 import { LandingNavbar } from "@/components/LandingNavbar";
 
 export const metadata = {
@@ -10,7 +11,10 @@ export const metadata = {
     "GridVault Pro terms of service, commercial licensing terms, and 30-day money-back guarantee.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default function TermsPage() {
+  const seller = sellerDetails();
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
       <LandingNavbar />
@@ -34,8 +38,13 @@ export default function TermsPage() {
             Terms of Service &amp; Commercial Rights
           </h1>
           <p className="text-sm text-slate-400 leading-relaxed max-w-2xl">
-            Effective Date: November 09, 2026. Please read these terms carefully before purchasing or downloading GridVault Pro.
+            Please read these terms before purchasing GridVault Pro.
           </p>
+          {seller && (
+            <p className="text-sm text-slate-300">
+              GridVault Pro is operated by {seller.legalName}. Contact <a className="text-emerald-400" href={`mailto:${seller.supportEmail}`}>{seller.supportEmail}</a>.
+            </p>
+          )}
         </div>
 
         {/* Highlights */}
@@ -56,7 +65,7 @@ export default function TermsPage() {
             </div>
             <h4 className="font-bold text-sm text-white">30-Day Money-Back</h4>
             <p className="text-xs text-slate-400">
-              Request a refund within 30 days of purchase.
+              Request a full refund for any reason within 30 days of purchase.
             </p>
           </div>
 
@@ -99,7 +108,9 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h3 className="text-lg font-bold text-white">3. 30-Day Money-Back Guarantee</h3>
             <p>
-              We stand behind GridVault Pro with a strict <strong>30-Day No-Questions-Asked Money-Back Guarantee</strong>. If the software fails to process your receipts or if you are unsatisfied for any reason, email <span className="text-emerald-400">support@gridvaultpro.com</span> within 30 days of purchase for a prompt 100% refund processed via Lemon Squeezy.
+              You can request a full refund for any reason within 30 days of purchase.
+              {seller && <> Email <a className="text-emerald-400" href={`mailto:${seller.supportEmail}`}>{seller.supportEmail}</a> with your order number.</>}
+              {" "}Lemon Squeezy processes refunds.
             </p>
           </section>
 
@@ -110,12 +121,6 @@ export default function TermsPage() {
             </p>
           </section>
 
-          <section className="space-y-3">
-            <h3 className="text-lg font-bold text-white">5. Governing Law</h3>
-            <p>
-              These Terms of Service are governed by and construed in accordance with the laws of the State of Delaware, United States, without regard to conflict of law principles.
-            </p>
-          </section>
         </div>
       </main>
     </div>
