@@ -117,7 +117,7 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h3 className="text-lg font-bold text-white">4. Disclaimer of Accounting &amp; Tax Advice</h3>
             <p>
-              GridVault Pro is an automated optical document extraction utility. While our math verification engine cross-checks totals and tax splits (Subtotal + Tax = Total), all extracted ledgers should be reviewed by qualified corporate bookkeepers, CPAs, or tax advisors prior to official statutory tax filings.
+              GridVault Pro is an automated optical document extraction utility. While our math verification engine cross-checks totals and tax splits (Subtotal + Tax + Round-off = Total), all extracted ledgers should be reviewed by qualified corporate bookkeepers, CPAs, or tax advisors prior to official statutory tax filings.
             </p>
           </section>
 

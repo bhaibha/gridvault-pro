@@ -74,6 +74,7 @@ export function generateWorkbook(
     if (taxMode !== "SIMPLE") {
       baseRecord.Total_Tax = Number((d.cgst + d.sgst + d.igst + d.vatOrSalesTax).toFixed(2));
     }
+    baseRecord.Round_Off = d.roundOff ?? 0;
     baseRecord.Grand_Total = d.totalAmount;
     baseRecord.Confidence = `${Math.round(d.confidence * 100)}%`;
     baseRecord.Notes_Details = safeExcelString(d.notesOrEmail);

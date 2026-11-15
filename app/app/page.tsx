@@ -23,6 +23,9 @@ import {
 
 import {
   ExtractedDocument,
+  DocType,
+  PURCHASE_DOCUMENT_TYPES,
+  reconcilesAmount,
   computeDuplicateHash,
   sanitizeNumber,
 } from "@/lib/extraction-engine";
@@ -73,7 +76,7 @@ export default function WorkspacePage() {
         doc.vendorOrContact,
         doc.invoiceOrRefNo,
         doc.totalAmount
-      ) + ":" + doc.currency;
+      ) + ":" + doc.currency + ":" + doc.docType;
       const hasIdentity = doc.date && doc.vendorOrContact && doc.invoiceOrRefNo && doc.invoiceOrRefNo !== "N/A";
       const isDup = Boolean(hasIdentity && seenHashes.has(hash));
       if (hasIdentity) seenHashes.add(hash);
@@ -185,41 +188,19 @@ export default function WorkspacePage() {
   // Inline cell editing with instant math verification
   const handleCellChange = (
     id: string,
-    field: keyof ExtractedDocument,
-    value: string | number
+    field: "subtotal" | "cgst" | "sgst" | "igst" | "vatOrSalesTax" | "roundOff" | "totalAmount" |
+      "date" | "vendorOrContact" | "invoiceOrRefNo" | "docType",
+    value: string
   ) => {
     if (processing.current) return;
     const updated = documents.map((doc) => {
       if (doc.id !== id) return doc;
-      const copy: Record<string, unknown> = { ...doc };
-
-      if (
-        [
-          "subtotal",
-          "cgst",
-          "sgst",
-          "igst",
-          "vatOrSalesTax",
-          "totalAmount",
-        ].includes(field)
-      ) {
-        copy[field] = sanitizeNumber(value);
-        const sub = copy.subtotal as number;
-        const tax =
-          (copy.cgst as number) +
-          (copy.sgst as number) +
-          (copy.igst as number) +
-          (copy.vatOrSalesTax as number);
-        const total = copy.totalAmount as number;
-        const expected = Number((sub + tax).toFixed(2));
-
-        const isReconciled = Math.abs(expected - total) <= 0.12;
-        copy.mathVerified = isReconciled;
-      } else {
-        copy[field] = value;
+      if (field === "docType") return { ...doc, docType: value as DocType };
+      if (field === "date" || field === "vendorOrContact" || field === "invoiceOrRefNo") {
+        return { ...doc, [field]: value };
       }
-
-      return copy as unknown as ExtractedDocument;
+      const copy = { ...doc, [field]: sanitizeNumber(value) };
+      return { ...copy, mathVerified: reconcilesAmount(copy) };
     });
 
     updateLedger(updated);
@@ -253,12 +234,14 @@ export default function WorkspacePage() {
       "Doc_ID",
       "Date",
       "Status",
+      "Type",
       "Vendor_Or_Contact",
       "Invoice_Ref",
       "Category",
       "Currency",
       "Subtotal",
       taxMode === "GST" ? "CGST\tSGST\tIGST\tTotal_Tax" : "Tax",
+      "Round_Off",
       "Grand_Total",
       "Confidence",
     ].join("\t");
@@ -268,8 +251,8 @@ export default function WorkspacePage() {
       const totalTax = doc.cgst + doc.sgst + doc.igst + doc.vatOrSalesTax;
       const tax = taxMode === "GST" ? [doc.cgst, doc.sgst, doc.igst, totalTax] : [totalTax];
       return [
-        doc.id, doc.date, reviewStatus(doc), doc.vendorOrContact, doc.invoiceOrRefNo,
-        doc.category, doc.currency, doc.subtotal, ...tax, doc.totalAmount,
+        doc.id, doc.date, reviewStatus(doc), doc.docType, doc.vendorOrContact, doc.invoiceOrRefNo,
+        doc.category, doc.currency, doc.subtotal, ...tax, doc.roundOff ?? 0, doc.totalAmount,
         `${Math.round(doc.confidence * 100)}%`,
       ].map((value) => typeof value === "string" ? tsvText(value) : value).join("\t");
     });
@@ -486,7 +469,7 @@ export default function WorkspacePage() {
                   {reviewCount}
                 </p>
                 <span className="text-[11px] text-slate-500 mt-0.5 block">
-                  Math, confidence, currency, or duplicates
+                  Check flags and excluded document types
                 </span>
               </div>
               <button
@@ -558,34 +541,10 @@ export default function WorkspacePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  {/* Column Letter Indicator */}
-                  <tr className="bg-slate-950 border-b border-slate-800 text-[10px] font-mono text-slate-500 font-bold">
-                    <th className="w-8 px-2 py-1 text-center border-r border-slate-800">#</th>
-                    <th className="px-3 py-1 text-center border-r border-slate-800">A</th>
-                    <th className="px-3 py-1 text-center border-r border-slate-800">B</th>
-                    <th className="px-3 py-1 text-center border-r border-slate-800">C</th>
-                    <th className="px-3 py-1 text-center border-r border-slate-800">D</th>
-                    <th className="px-3 py-1 text-center border-r border-slate-800">E</th>
-                    {taxMode === "GST" ? (
-                      <>
-                        <th className="px-3 py-1 text-center border-r border-slate-800">F</th>
-                        <th className="px-3 py-1 text-center border-r border-slate-800">G</th>
-                        <th className="px-3 py-1 text-center border-r border-slate-800">H</th>
-                      </>
-                    ) : (
-                      <>
-                        <th className="px-3 py-1 text-center border-r border-slate-800">F</th>
-                        <th className="px-3 py-1 text-center border-r border-slate-800">G</th>
-                      </>
-                    )}
-                    <th className="px-3 py-1 text-center border-r border-slate-800">•</th>
-                    <th className="px-3 py-1 text-center">•</th>
-                  </tr>
-
                   {/* Column Naming Headers */}
                   <tr className="bg-slate-900 text-slate-200 border-b border-slate-700/80 font-black text-[11px] uppercase tracking-wider">
                     <th className="w-8 px-2 py-2.5 text-center font-mono text-slate-500 border-r border-slate-700/60">•</th>
-                    <th className="p-3 border-r border-slate-700/60">Status</th>
+                    <th className="p-3 border-r border-slate-700/60">Status / Type</th>
                     <th className="p-3 border-r border-slate-700/60">Date</th>
                     <th className="p-3 border-r border-slate-700/60">Vendor / Contact</th>
                     <th className="p-3 border-r border-slate-700/60">Invoice / Ref</th>
@@ -598,6 +557,7 @@ export default function WorkspacePage() {
                     ) : (
                       <th className="p-3 text-right border-r border-slate-700/60">Tax</th>
                     )}
+                    <th className="p-3 text-right border-r border-slate-700/60">Round-off</th>
                     <th className="p-3 text-right border-r border-slate-700/60">Grand Total</th>
                     <th className="p-3 text-center border-r border-slate-700/60">Inspect</th>
                     <th className="p-3 text-center">Action</th>
@@ -637,6 +597,20 @@ export default function WorkspacePage() {
                               {Math.round(doc.confidence * 100)}% OK
                             </span>
                           )}
+                          <select
+                            aria-label={`Document type for ${doc.invoiceOrRefNo}`}
+                            className="mt-1 block max-w-36 rounded bg-slate-900 px-1 py-1 text-[11px] text-slate-300"
+                            value={doc.docType}
+                            disabled={isProcessing}
+                            onChange={(event) => handleCellChange(doc.id, "docType", event.target.value)}
+                          >
+                            {!PURCHASE_DOCUMENT_TYPES.some((type) => type === doc.docType) && (
+                              <option value={doc.docType}>{doc.docType.replaceAll("_", " ")}</option>
+                            )}
+                            {PURCHASE_DOCUMENT_TYPES.map((type) => (
+                              <option key={type} value={type}>{type.replaceAll("_", " ")}</option>
+                            ))}
+                          </select>
                         </td>
 
                         {/* Date */}
@@ -726,6 +700,26 @@ export default function WorkspacePage() {
                           </td>
                         )}
 
+                        <td className="p-2 text-right border-r border-slate-800/80">
+                          <input
+                            aria-label={`Round-off for ${doc.invoiceOrRefNo}`}
+                            type="number"
+                            step="0.01"
+                            defaultValue={doc.roundOff ?? 0}
+                            disabled={isProcessing}
+                            onBlur={(event) => {
+                              if (event.target.validity.badInput) {
+                                event.target.value = String(doc.roundOff ?? 0);
+                                return;
+                              }
+                              const roundOff = sanitizeNumber(event.target.value);
+                              event.target.value = String(roundOff);
+                              if (roundOff !== (doc.roundOff ?? 0)) handleCellChange(doc.id, "roundOff", event.target.value);
+                            }}
+                            className="w-20 rounded bg-transparent px-1.5 py-1 text-right font-mono text-slate-300"
+                          />
+                        </td>
+
                         {/* Grand Total */}
                         <td className="p-2 text-right border-r border-slate-800/80">
                           <input
@@ -768,7 +762,7 @@ export default function WorkspacePage() {
 
                   {visibleDocs.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="p-10 text-center text-slate-500">
+                      <td colSpan={taxMode === "GST" ? 11 : 10} className="p-10 text-center text-slate-500">
                         No documents in workspace. Drop files on the left or click
                         &ldquo;Load Stress-Test Batch&rdquo; to test.
                       </td>
